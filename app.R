@@ -389,12 +389,12 @@ server <- function(input, output, session) {
     showNotification("LLM 生成的页面已保存", type = "message")
   })
 
-  observeEvent(input$lint_go, {
-    output$lint_result <- renderPrint("检查中…")
-    res <- tryCatch(llm_lint_report(pages_df(), rv$wiki_root),
-                    error = function(e) paste("❌", conditionMessage(e)))
-    output$lint_result <- renderPrint(cat(res))
-  })
+  lint_res <- eventReactive(input$lint_go, {
+    tryCatch(llm_lint_report(pages_df(), rv$wiki_root),
+             error = function(e) paste("❌", conditionMessage(e)))
+  }, ignoreNULL = FALSE)
+
+  output$lint_result <- renderPrint(cat(lint_res()))
 }
 
 shinyApp(ui, server)

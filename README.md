@@ -82,7 +82,9 @@ LLM 功能需要 DeepSeek API key，两种方式（二选一）：
 ## 🧪 测试
 
 ```bash
-Rscript test_headless.R   # 扫描/解析/树/链接/图谱/搜索/lint 逻辑测试
+Rscript test_headless.R    # 9 项：扫描/解析/树/链接/图谱/搜索/lint 逻辑测试
+Rscript test_regression.R  # 12 项：全功能回归（含编辑写盘往返）
+Rscript test_server.R      # 8 项：Shiny testServer 集成测试（server 绑定层）
 ```
 
 ## ⚖️ License
