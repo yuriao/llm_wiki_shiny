@@ -17,9 +17,11 @@
 # PDF → 虚拟页面列表（按行分组切块，绝不切断句子）
 # chunk_chars: 每块目标字符数（llm_answer 对单页 body 截 2000，块需小于该值）
 # max_chunks:  上限块数，防止超大 PDF 撑爆 LLM 上下文
+# display_name: 显示用文件名（Shiny 上传的 datapath 是临时文件如 "0"，须传原始名）
 # 返回：page-like list，附加 attr "pdf_meta" = list(nchars, n_chunks, truncated)
 # 失败：返回以 "❌" 开头的错误字符串（由 app.R 的 is_pdf_error 识别）
-pdf_extract_pages <- function(pdf_path, chunk_chars = 1800, max_chunks = 24) {
+pdf_extract_pages <- function(pdf_path, chunk_chars = 1800, max_chunks = 24,
+                              display_name = NULL) {
   .pdf_require()
   if (!file.exists(pdf_path)) return(paste0("❌ PDF 文件不存在: ", pdf_path))
 
@@ -60,7 +62,9 @@ pdf_extract_pages <- function(pdf_path, chunk_chars = 1800, max_chunks = 24) {
   if (truncated) chunks <- chunks[seq_len(max_chunks)]
   n <- length(chunks)
 
-  fname <- tools::file_path_sans_ext(basename(pdf_path))
+  fname <- if (!is.null(display_name) && nzchar(display_name))
+    tools::file_path_sans_ext(basename(display_name))
+  else tools::file_path_sans_ext(basename(pdf_path))
   pages <- lapply(seq_len(n), function(i) {
     list(
       path        = pdf_path,

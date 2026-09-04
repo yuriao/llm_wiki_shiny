@@ -335,7 +335,8 @@ server <- function(input, output, session) {
   # PDF 上下文（上传后解析为虚拟页面；错误时返回 "❌…" 字符串）
   pdf_pages <- reactive({
     req(input$pdf_file)
-    pdf_extract_pages(input$pdf_file$datapath)
+    pdf_extract_pages(input$pdf_file$datapath,
+                      display_name = input$pdf_file$name %||% NULL)
   })
 
   output$pdf_status <- renderUI({
