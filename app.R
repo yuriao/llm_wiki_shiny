@@ -12,7 +12,7 @@ suppressMessages({
 })
 
 # ---- 加载模块 ----
-for (f in c("wiki_io.R", "wiki_render.R", "wiki_graph.R", "wiki_search.R", "llm_client.R")) {
+for (f in c("wiki_io.R", "wiki_render.R", "wiki_graph.R", "wiki_search.R", "llm_client.R", "pdf_io.R")) {
   src_file <- file.path("R", f)
   if (!file.exists(src_file)) stop("缺少模块文件: ", src_file)
   source(src_file, local = TRUE, encoding = "UTF-8")
@@ -85,6 +85,13 @@ ui <- page_sidebar(
     nav_panel("🤖 LLM（DeepSeek）",
       navset_card_underline(
         nav_panel("问答",
+          fileInput("pdf_file", "上传 PDF（可选，作为问答上下文）",
+                    accept = c(".pdf", "application/pdf"), width = "100%"),
+          radioButtons("pdf_mode", "作答模式",
+            choices = c("仅根据 PDF 作答" = "pdf_only",
+                        "综合 Wiki + PDF 判断" = "wiki_pdf"),
+            selected = "pdf_only", inline = TRUE),
+          uiOutput("pdf_status"),
           selectizeInput("qa_pages", "参考页面（可多选，留空则全库检索）",
                          choices = character(0), multiple = TRUE),
           textAreaInput("qa_question", "问题", rows = 3,
@@ -325,6 +332,29 @@ server <- function(input, output, session) {
   })
 
   # ---- LLM tab ----
+  # PDF 上下文（上传后解析为虚拟页面；错误时返回 "❌…" 字符串）
+  pdf_pages <- reactive({
+    req(input$pdf_file)
+    pdf_extract_pages(input$pdf_file$datapath)
+  })
+
+  output$pdf_status <- renderUI({
+    if (is.null(input$pdf_file)) {
+      return(div(class = "text-muted small",
+                 "未上传 PDF → 按原逻辑仅用 Wiki 页面作答"))
+    }
+    p <- pdf_pages()
+    if (is_pdf_error(p)) return(div(class = "alert alert-danger small py-1 px-2", p))
+    meta <- attr(p, "pdf_meta")
+    extra <- if (isTRUE(meta$truncated))
+      sprintf("（超大文件，已截断为前 %d 段）", meta$n_chunks) else ""
+    mode_txt <- if (identical(input$pdf_mode, "wiki_pdf")) "综合 Wiki + PDF" else "仅 PDF"
+    div(class = "alert alert-success small py-1 px-2",
+        sprintf("✅ %s · 提取 %s 字符 · %d 段%s · 当前模式：%s",
+                input$pdf_file$name, formatC(meta$nchars, big.mark = ","),
+                meta$n_chunks, extra, mode_txt))
+  })
+
   observe({
     updateSelectizeInput(session, "qa_pages", choices = known_titles(), server = TRUE)
   })
@@ -334,12 +364,21 @@ server <- function(input, output, session) {
     if (!nzchar(q)) { showNotification("请输入问题", type = "error"); return() }
     df <- pages_df()
     sel_titles <- input$qa_pages
-    ctx_pages <- if (length(sel_titles) > 0)
+    wiki_pages <- if (length(sel_titles) > 0)
       lapply(sel_titles, function(t) {
         hit <- df[df$title == t, ]
         if (nrow(hit) > 0) read_wiki_page(hit$path[1]) else NULL
       }) |> Filter(Negate(is.null), x = _)
     else lapply(df$path, read_wiki_page)
+    # 组装上下文：无 PDF → wiki；仅 PDF（默认）→ PDF；Wiki+PDF → 两者
+    pdf <- if (!is.null(input$pdf_file)) pdf_pages() else NULL
+    if (!is.null(pdf) && is_pdf_error(pdf)) {
+      showNotification(pdf, type = "error", duration = 10)
+      return()
+    }
+    ctx_pages <- if (is.null(pdf)) wiki_pages
+      else if (identical(input$pdf_mode, "wiki_pdf")) c(wiki_pages, pdf)
+      else pdf
     output$qa_result <- renderUI({
       div(class = "alert alert-info", "正在调用 DeepSeek…")
     })

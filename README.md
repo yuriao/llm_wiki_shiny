@@ -11,6 +11,7 @@
 | 🔍 搜索 | 全文搜索（标题 + frontmatter + 正文），返回匹配片段 |
 | ✏️ 编辑/新建 | 模态框编辑页面（YAML frontmatter + Markdown 正文），自动落盘 |
 | 🤖 LLM | DeepSeek 驱动：基于 wiki 上下文问答 / 一键生成新页面 / wiki 健康 lint（孤儿页、断链、过期内容） |
+| 📄 PDF 问答 | 上传 PDF 即可问答：默认仅基于 PDF 作答，或切换"综合 Wiki + PDF"模式让 LLM 交叉判断（扫描件不支持） |
 
 ## 🏗️ 目录结构
 
@@ -22,7 +23,8 @@ llm_wiki_shiny/
 │   ├── wiki_render.R      # Markdown 渲染 + wikilink 转换 + frontmatter 卡片
 │   ├── wiki_graph.R       # 知识图谱（visNetwork）
 │   ├── wiki_search.R      # 全文搜索
-│   └── llm_client.R       # DeepSeek 客户端（问答/生成/lint）
+│   ├── llm_client.R       # DeepSeek 客户端（问答/生成/lint）
+│   └── pdf_io.R           # PDF 文本提取 → 切块为虚拟 wiki 页面（pdftools）
 ├── example_wiki/          # 示例 wiki（中文，5 页）
 │   ├── SCHEMA.md / index.md / log.md
 │   ├── entities/ concepts/ comparisons/
@@ -84,8 +86,11 @@ LLM 功能需要 DeepSeek API key，两种方式（二选一）：
 ```bash
 Rscript test_headless.R    # 9 项：扫描/解析/树/链接/图谱/搜索/lint 逻辑测试
 Rscript test_regression.R  # 12 项：全功能回归（含编辑写盘往返）
-Rscript test_server.R      # 8 项：Shiny testServer 集成测试（server 绑定层）
+Rscript test_server.R      # 12 项：Shiny testServer 集成测试（含 PDF 上下文组装，mock LLM）
+Rscript test_pdf_io.R      # 6 项：PDF 提取/切块/错误路径/超大截断（需 pdftools + cupsfilter）
 ```
+
+PDF 问答依赖 `pdftools` R 包（系统需 poppler：`brew install poppler`）。
 
 ## ⚖️ License
 
